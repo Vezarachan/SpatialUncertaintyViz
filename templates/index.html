@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WBCP: Interactive Uncertainty Visualization</title>
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header class="header">
+        <h1>WBCP: Interactive Uncertainty Visualization</h1>
+        <span class="header-subtitle">Weighted Bayesian Conformal Prediction</span>
+    </header>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Dataset Panel -->
+            <div class="panel" id="panel-dataset">
+                <div class="panel-header" data-panel="dataset">
+                    <span class="panel-number">1</span>
+                    <span>Dataset</span>
+                    <span class="panel-toggle">&#9660;</span>
+                </div>
+                <div class="panel-body open" id="panel-body-dataset">
+                    <label>Select Dataset</label>
+                    <select id="dataset-select">
+                        <option value="">-- Choose a dataset --</option>
+                    </select>
+
+                    <div class="upload-area" id="upload-area">
+                        <label>Or upload CSV</label>
+                        <input type="file" id="file-upload" accept=".csv">
+                    </div>
+
+                    <div id="dataset-info" class="hidden">
+                        <div class="info-card" id="dataset-summary"></div>
+
+                        <label>Target Variable (Y)</label>
+                        <select id="target-select"></select>
+
+                        <label>Feature Variables (X)</label>
+                        <div id="feature-checkboxes" class="checkbox-group"></div>
+
+                        <label>Coordinate X Column</label>
+                        <select id="coord-x-select"></select>
+
+                        <label>Coordinate Y Column</label>
+                        <select id="coord-y-select"></select>
+
+                        <label>Coordinate Type</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="coord-type" value="geodetic" checked> Geodetic (Lon/Lat)</label>
+                            <label><input type="radio" name="coord-type" value="projected"> Projected (UTM, State Plane, etc.)</label>
+                        </div>
+
+                        <button id="btn-configure" class="btn btn-primary">Configure Dataset</button>
+                        <div id="configure-status" class="status-msg hidden"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Model Panel -->
+            <div class="panel" id="panel-model">
+                <div class="panel-header" data-panel="model">
+                    <span class="panel-number">2</span>
+                    <span>Model</span>
+                    <span class="panel-toggle">&#9654;</span>
+                </div>
+                <div class="panel-body" id="panel-body-model">
+                    <label>Base Prediction Model</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="model-type" value="ols" checked> OLS (Linear)</label>
+                        <label><input type="radio" name="model-type" value="random_forest"> Random Forest</label>
+                        <label><input type="radio" name="model-type" value="xgboost"> XGBoost</label>
+                        <label><input type="radio" name="model-type" value="gwr"> GWR</label>
+                    </div>
+
+                    <div id="model-params">
+                        <div id="params-rf" class="model-param-group hidden">
+                            <label>n_estimators: <span id="rf-n-val">100</span></label>
+                            <input type="range" id="rf-n-estimators" min="50" max="500" value="100" step="50">
+                            <label>max_depth: <span id="rf-depth-val">None</span></label>
+                            <input type="range" id="rf-max-depth" min="2" max="30" value="15">
+                        </div>
+                        <div id="params-xgb" class="model-param-group hidden">
+                            <label>n_estimators: <span id="xgb-n-val">100</span></label>
+                            <input type="range" id="xgb-n-estimators" min="50" max="500" value="100" step="50">
+                            <label>learning_rate: <span id="xgb-lr-val">0.1</span></label>
+                            <input type="range" id="xgb-learning-rate" min="0.01" max="0.3" value="0.1" step="0.01">
+                            <label>max_depth: <span id="xgb-depth-val">6</span></label>
+                            <input type="range" id="xgb-max-depth" min="2" max="15" value="6">
+                        </div>
+                    </div>
+
+                    <label>Train/Rest Split: <span id="split-val">0.80</span></label>
+                    <input type="range" id="train-ratio" min="0.5" max="0.9" value="0.8" step="0.05">
+
+                    <label>Random Seed</label>
+                    <input type="number" id="random-seed" value="42" min="0" class="input-num">
+
+                    <button id="btn-train" class="btn btn-primary" disabled>Train Model</button>
+                    <div id="train-status" class="status-msg hidden"></div>
+                    <div id="metrics-card" class="info-card hidden"></div>
+                </div>
+            </div>
+
+            <!-- CP Method Panel -->
+            <div class="panel" id="panel-method">
+                <div class="panel-header" data-panel="method">
+                    <span class="panel-number">3</span>
+                    <span>CP Method</span>
+                    <span class="panel-toggle">&#9654;</span>
+                </div>
+                <div class="panel-body" id="panel-body-method">
+                    <div id="method-groups"></div>
+                    <div id="method-params" class="hidden">
+                        <hr>
+                        <h4>Parameters</h4>
+                        <div id="param-controls"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Run Panel -->
+            <div class="panel" id="panel-run">
+                <div class="panel-header" data-panel="run">
+                    <span class="panel-number">4</span>
+                    <span>Run</span>
+                    <span class="panel-toggle">&#9654;</span>
+                </div>
+                <div class="panel-body" id="panel-body-run">
+                    <button id="btn-run" class="btn btn-run" disabled>Run Analysis</button>
+                    <div id="run-progress" class="hidden">
+                        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+                        <span id="run-status-text">Running...</span>
+                    </div>
+                    <div id="result-summary" class="info-card hidden"></div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="map-container" id="map-container">
+                <div id="map" class="map"></div>
+                <div class="map-controls">
+                    <select id="color-metric" class="map-control-select">
+                        <option value="uncertainty">Uncertainty</option>
+                        <option value="residual">Prediction Error</option>
+                        <option value="posterior_std">Posterior Std</option>
+                        <option value="n_eff">N_eff</option>
+                    </select>
+                    <div id="map-legend" class="map-legend"></div>
+                </div>
+                <div id="tooltip" class="map-tooltip hidden"></div>
+            </div>
+
+            <div class="chart-container" id="chart-container">
+                <div class="chart-tabs">
+                    <button class="chart-tab active" data-tab="coverage">Coverage</button>
+                    <button class="chart-tab" data-tab="uncertainty">Uncertainty</button>
+                    <button class="chart-tab" data-tab="intervals">Intervals</button>
+                    <button class="chart-tab" data-tab="posterior">Posterior</button>
+                    <button class="chart-tab" data-tab="neff">N_eff</button>
+                    <button class="chart-tab" data-tab="residuals">Residuals</button>
+                </div>
+                <div class="chart-area" id="chart-area">
+                    <div class="chart-placeholder">Select a dataset, train a model, and run an analysis to see results.</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <script src="https://unpkg.com/deck.gl@9.0.16/dist.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script type="module" src="/static/js/api.js?v=2"></script>
+    <script type="module" src="/static/js/state.js?v=2"></script>
+    <script type="module" src="/static/js/sidebar.js?v=2"></script>
+    <script type="module" src="/static/js/mapView.js?v=2"></script>
+    <script type="module" src="/static/js/charts.js?v=2"></script>
+    <script type="module" src="/static/js/app.js?v=2"></script>
+</body>
+</html>
