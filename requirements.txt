@@ -9,3 +9,4 @@ pyproj>=3.6
 quantile-forest>=1.2
 scipy>=1.11
 joblib>=1.3
+gunicorn>=25.1.0
