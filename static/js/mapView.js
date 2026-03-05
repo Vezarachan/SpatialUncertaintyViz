@@ -271,7 +271,7 @@ function updateHaloLayers(results) {
 
     // Adaptive radii based on data extent and point count
     const N = data.length;
-    const maxHaloRadius = Math.max(500, currentDataExtent * 111000 / Math.max(60, Math.sqrt(N) * 2.5));
+    const maxHaloRadius = Math.max(800, currentDataExtent * 111000 / Math.max(40, Math.sqrt(N) * 1.5));
     const minHaloRadius = maxHaloRadius * 0.15;
 
     // Layer 1: Outer glow — semi-transparent, proportional to uncertainty
@@ -284,8 +284,8 @@ function updateHaloLayers(results) {
             return [c[0], c[1], c[2], 70];
         },
         getRadius: d => minHaloRadius + d.normalizedUnc * (maxHaloRadius - minHaloRadius),
-        radiusMinPixels: 4,
-        radiusMaxPixels: 24,
+        radiusMinPixels: 6,
+        radiusMaxPixels: 35,
         pickable: false,
     });
 
@@ -299,13 +299,13 @@ function updateHaloLayers(results) {
             return [c[0], c[1], c[2], 130];
         },
         getRadius: d => (minHaloRadius + d.normalizedUnc * (maxHaloRadius - minHaloRadius)) * 0.55,
-        radiusMinPixels: 3,
-        radiusMaxPixels: 14,
+        radiusMinPixels: 4,
+        radiusMaxPixels: 20,
         pickable: false,
     });
 
     // Layer 3: Center dot — opaque, colored by predicted value
-    const centerRadius = Math.max(150, currentDataExtent * 111000 / Math.max(120, Math.sqrt(N) * 4));
+    const centerRadius = Math.max(80, currentDataExtent * 111000 / Math.max(200, Math.sqrt(N) * 6));
     const centerDot = new deck.ScatterplotLayer({
         id: 'halo-center',
         data,
@@ -315,8 +315,8 @@ function updateHaloLayers(results) {
         stroked: true,
         lineWidthMinPixels: 1,
         getRadius: centerRadius,
-        radiusMinPixels: 3,
-        radiusMaxPixels: 10,
+        radiusMinPixels: 2,
+        radiusMaxPixels: 6,
         pickable: true,
         autoHighlight: true,
         highlightColor: [255, 255, 0, 180],
