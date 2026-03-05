@@ -200,6 +200,7 @@ function updateScatterLayers(results, metric) {
             trueValue: pp.true_value?.[i] ?? 0,
             covered: pp.covered?.[i] ?? false,
             residual: pp.residual?.[i] ?? 0,
+            nEff: pp.n_eff?.[i] ?? null,
         };
     });
 
@@ -265,11 +266,12 @@ function updateHaloLayers(results) {
         trueValue: pp.true_value?.[i] ?? 0,
         covered: pp.covered?.[i] ?? false,
         residual: pp.residual?.[i] ?? 0,
+        nEff: pp.n_eff?.[i] ?? null,
     }));
 
     // Adaptive radii based on data extent and point count
     const N = data.length;
-    const maxHaloRadius = Math.max(800, currentDataExtent * 111000 / Math.max(40, Math.sqrt(N) * 1.5));
+    const maxHaloRadius = Math.max(500, currentDataExtent * 111000 / Math.max(60, Math.sqrt(N) * 2.5));
     const minHaloRadius = maxHaloRadius * 0.15;
 
     // Layer 1: Outer glow — semi-transparent, proportional to uncertainty
@@ -282,8 +284,8 @@ function updateHaloLayers(results) {
             return [c[0], c[1], c[2], 70];
         },
         getRadius: d => minHaloRadius + d.normalizedUnc * (maxHaloRadius - minHaloRadius),
-        radiusMinPixels: 6,
-        radiusMaxPixels: 35,
+        radiusMinPixels: 4,
+        radiusMaxPixels: 24,
         pickable: false,
     });
 
@@ -297,13 +299,13 @@ function updateHaloLayers(results) {
             return [c[0], c[1], c[2], 130];
         },
         getRadius: d => (minHaloRadius + d.normalizedUnc * (maxHaloRadius - minHaloRadius)) * 0.55,
-        radiusMinPixels: 4,
-        radiusMaxPixels: 20,
+        radiusMinPixels: 3,
+        radiusMaxPixels: 14,
         pickable: false,
     });
 
     // Layer 3: Center dot — opaque, colored by predicted value
-    const centerRadius = Math.max(200, currentDataExtent * 111000 / Math.max(100, Math.sqrt(N) * 3));
+    const centerRadius = Math.max(150, currentDataExtent * 111000 / Math.max(120, Math.sqrt(N) * 4));
     const centerDot = new deck.ScatterplotLayer({
         id: 'halo-center',
         data,
@@ -341,6 +343,7 @@ function handlePointHover(info) {
         html += `Uncertainty: ${d.uncertainty.toFixed(3)}<br>`;
         html += `Covered: ${d.covered ? 'Yes' : 'No'}<br>`;
         html += `Residual: ${d.residual.toFixed(3)}`;
+        if (d.nEff !== null) html += `<br>N_eff: ${d.nEff.toFixed(1)}`;
         tooltip.innerHTML = html;
         tooltip.style.left = info.x + 10 + 'px';
         tooltip.style.top = info.y + 10 + 'px';
@@ -368,20 +371,14 @@ function valueToColor(t, metric) {
         }
     }
 
-    // Sequential: deep blue → cyan → green → yellow → red
-    // More visible at low values than the previous scheme
-    if (t < 0.25) {
-        const s = t * 4;
-        return [30, Math.round(60 + s * 140), Math.round(180 + s * 40), 220];
-    } else if (t < 0.5) {
-        const s = (t - 0.25) * 4;
-        return [Math.round(30 + s * 100), Math.round(200 - s * 10), Math.round(220 - s * 140), 220];
-    } else if (t < 0.75) {
-        const s = (t - 0.5) * 4;
-        return [Math.round(130 + s * 125), Math.round(190 + s * 50), Math.round(80 - s * 60), 220];
+    // Sequential: #326B77 (teal) → #CABED0 (lavender) → #A74D30 (terra cotta)
+    // Low = cool, Mid = near-white, High = warm
+    if (t < 0.5) {
+        const s = t * 2;
+        return [Math.round(50 + s * 152), Math.round(107 + s * 83), Math.round(119 + s * 89), 220];
     } else {
-        const s = (t - 0.75) * 4;
-        return [255, Math.round(240 - s * 180), Math.round(20 - s * 20), 220];
+        const s = (t - 0.5) * 2;
+        return [Math.round(202 - s * 35), Math.round(190 - s * 113), Math.round(208 - s * 160), 220];
     }
 }
 

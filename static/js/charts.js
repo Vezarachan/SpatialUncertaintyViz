@@ -21,9 +21,9 @@ function initCharts() {
         renderActiveChart();
     });
 
-    // Listen for point selection (for posterior tab)
+    // Listen for point selection (for posterior and neff tabs)
     State.on('pointSelected', () => {
-        if (activeTab === 'posterior') {
+        if (activeTab === 'posterior' || activeTab === 'neff') {
             renderActiveChart();
         }
     });
@@ -254,7 +254,7 @@ function renderUncertaintyHistogram(container, width, height) {
         .attr('y', h + 35)
         .attr('text-anchor', 'middle')
         .attr('class', 'axis-label')
-        .text('Interval Width');
+        .text('Uncertainty (Interval Half-Width)');
 
     g.append('text')
         .attr('transform', 'rotate(-90)')
@@ -473,7 +473,7 @@ function renderPosterior(container, width, height) {
         .attr('y', h + 35)
         .attr('text-anchor', 'middle')
         .attr('class', 'axis-label')
-        .text('Value');
+        .text('Quantile Value');
 
     g.append('text')
         .attr('transform', 'rotate(-90)')
@@ -552,6 +552,27 @@ function renderNeff(container, width, height) {
         .attr('font-size', '10px')
         .text(`Mean: ${mean.toFixed(1)}`);
 
+    // Selected point marker
+    const pointIdx = State.selectedPointIndex;
+    if (pointIdx !== null && pointIdx < values.length) {
+        const ptVal = values[pointIdx];
+        if (Number.isFinite(ptVal)) {
+            g.append('line')
+                .attr('x1', x(ptVal)).attr('y1', 0)
+                .attr('x2', x(ptVal)).attr('y2', h)
+                .attr('stroke', '#00e5ff')
+                .attr('stroke-width', 2)
+                .attr('stroke-dasharray', '3,2');
+
+            g.append('text')
+                .attr('x', x(ptVal) + 5)
+                .attr('y', 26)
+                .attr('fill', '#00e5ff')
+                .attr('font-size', '10px')
+                .text(`Point #${pointIdx}: ${ptVal.toFixed(1)}`);
+        }
+    }
+
     // Axes
     g.append('g')
         .attr('class', 'axis')
@@ -567,7 +588,7 @@ function renderNeff(container, width, height) {
         .attr('y', h + 35)
         .attr('text-anchor', 'middle')
         .attr('class', 'axis-label')
-        .text('N_eff');
+        .text('Effective Sample Size (N_eff)');
 
     g.append('text')
         .attr('transform', 'rotate(-90)')
