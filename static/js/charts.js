@@ -21,9 +21,9 @@ function initCharts() {
         renderActiveChart();
     });
 
-    // Listen for point selection (for posterior and neff tabs)
+    // Listen for point selection (for posterior, neff, and uncertainty tabs)
     State.on('pointSelected', () => {
-        if (activeTab === 'posterior' || activeTab === 'neff') {
+        if (activeTab === 'posterior' || activeTab === 'neff' || activeTab === 'uncertainty') {
             renderActiveChart();
         }
     });
@@ -237,6 +237,27 @@ function renderUncertaintyHistogram(container, width, height) {
         .attr('fill', '#f39c12')
         .attr('font-size', '10px')
         .text(`Median: ${median.toFixed(3)}`);
+
+    // Selected point marker
+    const pointIdx = State.selectedPointIndex;
+    if (pointIdx !== null && pointIdx < values.length) {
+        const ptVal = values[pointIdx];
+        if (Number.isFinite(ptVal)) {
+            g.append('line')
+                .attr('x1', x(ptVal)).attr('y1', 0)
+                .attr('x2', x(ptVal)).attr('y2', h)
+                .attr('stroke', '#00e5ff')
+                .attr('stroke-width', 2)
+                .attr('stroke-dasharray', '3,2');
+
+            g.append('text')
+                .attr('x', x(ptVal) + 5)
+                .attr('y', 26)
+                .attr('fill', '#00e5ff')
+                .attr('font-size', '10px')
+                .text(`Point #${pointIdx}: ${ptVal.toFixed(3)}`);
+        }
+    }
 
     // Axes
     g.append('g')
