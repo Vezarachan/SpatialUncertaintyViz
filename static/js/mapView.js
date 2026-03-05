@@ -267,9 +267,10 @@ function updateHaloLayers(results) {
         residual: pp.residual?.[i] ?? 0,
     }));
 
-    // Adaptive radii based on data extent
-    const maxHaloRadius = Math.max(2000, currentDataExtent * 111000 / 22);
-    const minHaloRadius = maxHaloRadius * 0.12;
+    // Adaptive radii based on data extent and point count
+    const N = data.length;
+    const maxHaloRadius = Math.max(800, currentDataExtent * 111000 / Math.max(40, Math.sqrt(N) * 1.5));
+    const minHaloRadius = maxHaloRadius * 0.15;
 
     // Layer 1: Outer glow — semi-transparent, proportional to uncertainty
     const outerGlow = new deck.ScatterplotLayer({
@@ -281,8 +282,8 @@ function updateHaloLayers(results) {
             return [c[0], c[1], c[2], 70];
         },
         getRadius: d => minHaloRadius + d.normalizedUnc * (maxHaloRadius - minHaloRadius),
-        radiusMinPixels: 12,
-        radiusMaxPixels: 60,
+        radiusMinPixels: 6,
+        radiusMaxPixels: 35,
         pickable: false,
     });
 
@@ -296,13 +297,13 @@ function updateHaloLayers(results) {
             return [c[0], c[1], c[2], 130];
         },
         getRadius: d => (minHaloRadius + d.normalizedUnc * (maxHaloRadius - minHaloRadius)) * 0.55,
-        radiusMinPixels: 7,
-        radiusMaxPixels: 35,
+        radiusMinPixels: 4,
+        radiusMaxPixels: 20,
         pickable: false,
     });
 
     // Layer 3: Center dot — opaque, colored by predicted value
-    const centerRadius = Math.max(400, currentDataExtent * 111000 / 80);
+    const centerRadius = Math.max(200, currentDataExtent * 111000 / Math.max(100, Math.sqrt(N) * 3));
     const centerDot = new deck.ScatterplotLayer({
         id: 'halo-center',
         data,
@@ -312,8 +313,8 @@ function updateHaloLayers(results) {
         stroked: true,
         lineWidthMinPixels: 1,
         getRadius: centerRadius,
-        radiusMinPixels: 4,
-        radiusMaxPixels: 14,
+        radiusMinPixels: 3,
+        radiusMaxPixels: 10,
         pickable: true,
         autoHighlight: true,
         highlightColor: [255, 255, 0, 180],
