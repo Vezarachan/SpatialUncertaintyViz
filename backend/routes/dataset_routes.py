@@ -132,7 +132,9 @@ def configure_dataset():
 
         # Store in single-user session (no cookie dependency)
         from backend.services.session_store import get_session
+        import logging
         sess = get_session()
+        logging.warning(f"[configure] BEFORE update: keys={list(sess.keys())}, id(sess)={id(sess)}")
         sess.update({
             "dataset_name": dataset_name,
             "df": df,
@@ -146,6 +148,7 @@ def configure_dataset():
             "coord_type": effective_coord_type,
             "region_col": region_col,
         })
+        logging.warning(f"[configure] AFTER update: keys={list(sess.keys())}, id(sess)={id(sess)}")
 
         response = {
             "status": "ok",

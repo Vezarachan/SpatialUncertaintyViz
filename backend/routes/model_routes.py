@@ -10,6 +10,8 @@ model_bp = Blueprint("model", __name__)
 @model_bp.route("/model/train", methods=["POST"])
 def train_model():
     sess = get_session()
+    import logging
+    logging.warning(f"[train] session keys={list(sess.keys())}, id(store)={id(sess)}")
     if "X" not in sess:
         return jsonify({"error": "No dataset configured. Please configure a dataset first."}), 400
 
