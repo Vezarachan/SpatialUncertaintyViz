@@ -1,5 +1,5 @@
 """Dataset API routes."""
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify
 from backend.services import dataset_service, coordinate_service
 from config import BUILTIN_DATASETS
 import numpy as np
@@ -130,15 +130,10 @@ def configure_dataset():
         coord_stats = coordinate_service.compute_coord_stats(coords)
         bandwidth_suggestion = coordinate_service.suggest_bandwidth(effective_coord_type, coord_stats)
 
-        # Store in session-like global store (simple dict for single-user)
-        from backend.services.session_store import store
-        sid = session.get("sid")
-        if not sid:
-            import uuid
-            sid = str(uuid.uuid4())[:8]
-            session["sid"] = sid
-
-        store[sid] = {
+        # Store in single-user session (no cookie dependency)
+        from backend.services.session_store import get_session
+        sess = get_session()
+        sess.update({
             "dataset_name": dataset_name,
             "df": df,
             "X": X,
@@ -150,7 +145,7 @@ def configure_dataset():
             "coord_cols": coord_cols,
             "coord_type": effective_coord_type,
             "region_col": region_col,
-        }
+        })
 
         response = {
             "status": "ok",

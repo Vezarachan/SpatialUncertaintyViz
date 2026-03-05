@@ -1,7 +1,7 @@
 """Analysis API routes."""
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify
 from backend.services import analysis_service
-from backend.services.session_store import store
+from backend.services.session_store import get_session
 from config import METHOD_REGISTRY, DEFAULT_PARAMS
 
 analysis_bp = Blueprint("analysis", __name__)
@@ -25,11 +25,10 @@ def list_methods():
 
 @analysis_bp.route("/analysis/run", methods=["POST"])
 def run_analysis():
-    sid = session.get("sid")
-    if not sid or sid not in store:
+    sess = get_session()
+    if "X" not in sess:
         return jsonify({"error": "No dataset configured"}), 400
 
-    sess = store[sid]
     if not sess.get("trained"):
         return jsonify({"error": "No model trained. Please train a model first."}), 400
 

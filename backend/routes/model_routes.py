@@ -1,7 +1,7 @@
 """Model training API routes."""
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify
 from backend.services import model_service
-from backend.services.session_store import store
+from backend.services.session_store import get_session
 import numpy as np
 
 model_bp = Blueprint("model", __name__)
@@ -9,8 +9,8 @@ model_bp = Blueprint("model", __name__)
 
 @model_bp.route("/model/train", methods=["POST"])
 def train_model():
-    sid = session.get("sid")
-    if not sid or sid not in store:
+    sess = get_session()
+    if "X" not in sess:
         return jsonify({"error": "No dataset configured. Please configure a dataset first."}), 400
 
     data = request.get_json()
@@ -19,7 +19,6 @@ def train_model():
     random_seed = data.get("random_seed", 42)
     model_params = data.get("model_params", {})
 
-    sess = store[sid]
     X = sess["X"]
     y = sess["y"]
     coords = sess["coords"]
@@ -83,11 +82,7 @@ def train_model():
 
 @model_bp.route("/model/status", methods=["GET"])
 def model_status():
-    sid = session.get("sid")
-    if not sid or sid not in store:
-        return jsonify({"trained": False})
-
-    sess = store[sid]
+    sess = get_session()
     if sess.get("trained"):
         return jsonify({
             "trained": True,
