@@ -101,6 +101,27 @@ def suggest_bandwidth(coord_type, coord_stats):
         }
 
 
+def is_likely_projected(x_coords, y_coords):
+    """Detect if coordinate values are likely projected (meters) rather than geodetic (degrees).
+    Returns True if coordinates are outside plausible lon/lat bounds.
+    """
+    x = np.asarray(x_coords, dtype=float)
+    y = np.asarray(y_coords, dtype=float)
+    x_min, x_max = float(np.min(x)), float(np.max(x))
+    y_min, y_max = float(np.min(y)), float(np.max(y))
+
+    # Geodetic bounds: longitude [-180, 180], latitude [-90, 90]
+    # Allow some tolerance for rounding / minor overshoot
+    if x_max > 360 or x_min < -360 or y_max > 90.1 or y_min < -90.1:
+        return True
+
+    # Also check if values are too large to be degrees (e.g., UTM easting/northing)
+    if abs(x_max) > 1000 or abs(x_min) > 1000 or abs(y_max) > 1000 or abs(y_min) > 1000:
+        return True
+
+    return False
+
+
 def estimate_utm_zone(x_coords, y_coords):
     """Estimate UTM zone from coordinate ranges. Returns EPSG code."""
     mean_x = np.mean(x_coords)

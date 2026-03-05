@@ -5,8 +5,8 @@ import State from './state.js';
 // Parameter definitions for CP method UI controls
 const PARAM_DEFS = {
     alpha: { label: 'Miscoverage Level (\u03b1)', type: 'float', default: 0.1, min: 0.01, max: 0.5, step: 0.01 },
-    bandwidth: { label: 'Bandwidth', type: 'float', default: 0.15, min: 0.01, max: 5.0, step: 0.01 },
-    base_bandwidth: { label: 'Base Bandwidth', type: 'float', default: 0.15, min: 0.01, max: 5.0, step: 0.01 },
+    bandwidth: { label: 'Bandwidth', type: 'float', default: 0.15, min: 0.01, max: 5.0, step: 0.01, isBandwidth: true },
+    base_bandwidth: { label: 'Base Bandwidth', type: 'float', default: 0.15, min: 0.01, max: 5.0, step: 0.01, isBandwidth: true },
     beta: { label: 'Prior Strength (\u03b2)', type: 'float', default: 0.9, min: 0.01, max: 0.99, step: 0.01 },
     num_mc: { label: 'MC Samples', type: 'int', default: 1000, min: 100, max: 10000, step: 100 },
     k: { label: 'k (Neighbors)', type: 'int', default: 20, min: 5, max: 500, step: 5 },
@@ -22,6 +22,13 @@ let datasetList = [];
 // Store coordinate info from configure response for bandwidth scaling
 let currentCoordType = 'geodetic';
 let currentBandwidthSuggestion = null;
+// Store native (meter/degree) bandwidth defaults for unit conversion
+let nativeBandwidthDef = null;
+// Current bandwidth display unit and conversion factor
+// factor: multiply native value by factor to get display value
+//   e.g. native=5000m, unit='km', factor=0.001 => display=5
+let bwUnit = 'degrees';
+let bwFactor = 1;
 
 // ============================================================
 // Initialization
@@ -38,68 +45,101 @@ async function initSidebar() {
 // Bandwidth scaling based on coordinate type
 // ============================================================
 function updateBandwidthParams(coordType, suggestion) {
-    /**
-     * Update PARAM_DEFS for bandwidth and base_bandwidth based on
-     * coordinate type and backend-computed suggestion.
-     * - geodetic (lon/lat): small values in degrees
-     * - projected (UTM, etc.): large values in meters
-     */
     currentCoordType = coordType;
     currentBandwidthSuggestion = suggestion;
 
     if (suggestion) {
-        // Use server-computed suggestion based on actual data extent
-        const bw = suggestion;
-        PARAM_DEFS.bandwidth.default = bw.default;
-        PARAM_DEFS.bandwidth.min = bw.min;
-        PARAM_DEFS.bandwidth.max = bw.max;
-        PARAM_DEFS.bandwidth.step = bw.step;
-        // base_bandwidth uses same scale
-        PARAM_DEFS.base_bandwidth.default = bw.default;
-        PARAM_DEFS.base_bandwidth.min = bw.min;
-        PARAM_DEFS.base_bandwidth.max = bw.max;
-        PARAM_DEFS.base_bandwidth.step = bw.step;
+        // Store native-unit values (always in original coordinate units)
+        nativeBandwidthDef = { ...suggestion };
     } else {
-        // Fallback heuristic when no suggestion available
         if (coordType === 'projected') {
-            PARAM_DEFS.bandwidth.default = 5000;
-            PARAM_DEFS.bandwidth.min = 100;
-            PARAM_DEFS.bandwidth.max = 100000;
-            PARAM_DEFS.bandwidth.step = 100;
-            PARAM_DEFS.base_bandwidth.default = 5000;
-            PARAM_DEFS.base_bandwidth.min = 100;
-            PARAM_DEFS.base_bandwidth.max = 100000;
-            PARAM_DEFS.base_bandwidth.step = 100;
+            nativeBandwidthDef = { default: 5000, min: 100, max: 100000, step: 100 };
         } else {
-            // geodetic defaults
-            PARAM_DEFS.bandwidth.default = 0.15;
-            PARAM_DEFS.bandwidth.min = 0.01;
-            PARAM_DEFS.bandwidth.max = 5.0;
-            PARAM_DEFS.bandwidth.step = 0.01;
-            PARAM_DEFS.base_bandwidth.default = 0.15;
-            PARAM_DEFS.base_bandwidth.min = 0.01;
-            PARAM_DEFS.base_bandwidth.max = 5.0;
-            PARAM_DEFS.base_bandwidth.step = 0.01;
+            nativeBandwidthDef = { default: 0.15, min: 0.01, max: 5.0, step: 0.01 };
         }
     }
 
-    // Update label to show units
-    const unit = coordType === 'projected' ? ' (meters)' : ' (degrees)';
-    PARAM_DEFS.bandwidth.label = 'Bandwidth' + unit;
-    PARAM_DEFS.base_bandwidth.label = 'Base Bandwidth' + unit;
+    // Choose default unit based on coordinate type and scale
+    if (coordType === 'projected') {
+        const diag = currentBandwidthSuggestion ? currentBandwidthSuggestion.max * 2 : 100000;
+        // Default to km if extent > 50 km
+        if (diag > 50000) {
+            bwUnit = 'km';
+            bwFactor = 0.001;
+        } else {
+            bwUnit = 'm';
+            bwFactor = 1;
+        }
+    } else {
+        bwUnit = 'degrees';
+        bwFactor = 1;
+    }
 
-    console.log(`[Sidebar] Bandwidth params updated for ${coordType}:`,
-        `default=${PARAM_DEFS.bandwidth.default}, range=[${PARAM_DEFS.bandwidth.min}, ${PARAM_DEFS.bandwidth.max}]`);
+    // Apply unit conversion to PARAM_DEFS
+    applyBandwidthUnit();
+
+    console.log(`[Sidebar] Bandwidth: ${coordType}, unit=${bwUnit}, ` +
+        `native default=${nativeBandwidthDef.default}, display default=${PARAM_DEFS.bandwidth.default}`);
 
     // If a method is already selected that uses bandwidth, re-render its params
     refreshMethodParamsIfNeeded();
 }
 
+function applyBandwidthUnit() {
+    // Apply unit conversion factor to bandwidth PARAM_DEFS
+    const nd = nativeBandwidthDef;
+    const f = bwFactor;
+
+    // Compute display values
+    const dispDefault = roundSmart(nd.default * f);
+    const dispMin = roundSmart(nd.min * f);
+    const dispMax = roundSmart(nd.max * f);
+    const dispStep = roundSmart(Math.max(nd.step * f, getMinStep(dispMax)));
+
+    PARAM_DEFS.bandwidth.default = dispDefault;
+    PARAM_DEFS.bandwidth.min = dispMin;
+    PARAM_DEFS.bandwidth.max = dispMax;
+    PARAM_DEFS.bandwidth.step = dispStep;
+    PARAM_DEFS.base_bandwidth.default = dispDefault;
+    PARAM_DEFS.base_bandwidth.min = dispMin;
+    PARAM_DEFS.base_bandwidth.max = dispMax;
+    PARAM_DEFS.base_bandwidth.step = dispStep;
+
+    // Update labels
+    const unitLabel = bwUnit === 'km' ? 'km' : bwUnit === 'm' ? 'm' : 'degrees';
+    PARAM_DEFS.bandwidth.label = `Bandwidth (${unitLabel})`;
+    PARAM_DEFS.base_bandwidth.label = `Base Bandwidth (${unitLabel})`;
+}
+
+function roundSmart(v) {
+    // Round to reasonable precision
+    if (Math.abs(v) >= 100) return Math.round(v);
+    if (Math.abs(v) >= 1) return Math.round(v * 100) / 100;
+    if (Math.abs(v) >= 0.01) return Math.round(v * 10000) / 10000;
+    return v;
+}
+
+function getMinStep(maxVal) {
+    // Get a reasonable minimum step size
+    if (maxVal >= 1000) return 1;
+    if (maxVal >= 100) return 0.1;
+    if (maxVal >= 10) return 0.01;
+    return 0.001;
+}
+
+function getAvailableUnits() {
+    if (currentCoordType === 'projected') {
+        return [
+            { value: 'm', label: 'm', factor: 1 },
+            { value: 'km', label: 'km', factor: 0.001 },
+        ];
+    }
+    return [
+        { value: 'degrees', label: 'degrees', factor: 1 },
+    ];
+}
+
 function refreshMethodParamsIfNeeded() {
-    /**
-     * If a CP method is currently selected and it uses bandwidth/base_bandwidth,
-     * re-render the param sliders with updated PARAM_DEFS.
-     */
     if (!State.selectedMethod) return;
     const methodInfo = methodRegistry[State.selectedMethod];
     if (!methodInfo) return;
@@ -115,7 +155,6 @@ function refreshMethodParamsIfNeeded() {
 async function loadDatasets() {
     try {
         const data = await API.getDatasets();
-        // API returns {datasets: [{name, builtin, rows, columns, description, config}, ...]}
         datasetList = data.datasets || [];
         const select = document.getElementById('dataset-select');
         select.innerHTML = '<option value="">-- Choose a dataset --</option>';
@@ -161,6 +200,18 @@ function bindDatasetEvents() {
         await handleDatasetSelected(name);
     });
 
+    // Coord type radio: show/hide EPSG input
+    document.querySelectorAll('input[name="coord-type"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            const epsgGroup = document.getElementById('epsg-group');
+            if (radio.value === 'projected' && radio.checked) {
+                epsgGroup.classList.remove('hidden');
+            } else if (radio.value === 'geodetic' && radio.checked) {
+                epsgGroup.classList.add('hidden');
+            }
+        });
+    });
+
     // File upload
     const fileInput = document.getElementById('file-upload');
     fileInput.addEventListener('change', async () => {
@@ -192,7 +243,6 @@ async function handleDatasetSelected(name) {
     updateButtonStates();
 
     try {
-        // Preview API returns: {columns, numeric_columns, dtypes, rows, n_total, coord_detection, default_config?}
         previewData = await API.previewDataset(name);
         if (previewData.error) {
             showStatus('configure-status', previewData.error, 'error');
@@ -211,7 +261,6 @@ function populateDatasetInfo(data) {
     const numericCols = data.numeric_columns || columns;
     const defaults = data.default_config || {};
 
-    // Summary
     const summary = document.getElementById('dataset-summary');
     summary.innerHTML = `
         <strong>${State.datasetName}</strong><br>
@@ -219,16 +268,13 @@ function populateDatasetInfo(data) {
         <small style="color:var(--text-muted)">${columns.join(', ')}</small>
     `;
 
-    // Populate target select (only numeric columns)
     populateSelect('target-select', numericCols, defaults.target);
 
-    // Coordinate selects: defaults.coords is [x_col, y_col] array
     const defaultCoordX = defaults.coords ? defaults.coords[0] : autoDetectColumn(columns, 'x');
     const defaultCoordY = defaults.coords ? defaults.coords[1] : autoDetectColumn(columns, 'y');
     populateSelect('coord-x-select', columns, defaultCoordX);
     populateSelect('coord-y-select', columns, defaultCoordY);
 
-    // Feature checkboxes
     const featureContainer = document.getElementById('feature-checkboxes');
     featureContainer.innerHTML = '';
     const defaultFeatures = defaults.features || [];
@@ -252,7 +298,26 @@ function populateDatasetInfo(data) {
     // Set coordinate type
     if (defaults.coord_type) {
         const radio = document.querySelector(`input[name="coord-type"][value="${defaults.coord_type}"]`);
-        if (radio) radio.checked = true;
+        if (radio) {
+            radio.checked = true;
+            radio.dispatchEvent(new Event('change'));
+        }
+    }
+
+    // Set EPSG code if available
+    const epsgInput = document.getElementById('epsg-code');
+    if (defaults.epsg) {
+        epsgInput.value = defaults.epsg;
+    } else {
+        epsgInput.value = '';
+    }
+
+    // Show/hide EPSG based on coord type
+    const epsgGroup = document.getElementById('epsg-group');
+    if (defaults.coord_type === 'projected') {
+        epsgGroup.classList.remove('hidden');
+    } else {
+        epsgGroup.classList.add('hidden');
     }
 }
 
@@ -285,6 +350,8 @@ async function handleConfigure() {
     const coordX = document.getElementById('coord-x-select').value;
     const coordY = document.getElementById('coord-y-select').value;
     const coordType = document.querySelector('input[name="coord-type"]:checked').value;
+    const epsgVal = document.getElementById('epsg-code').value.trim();
+    const epsg = epsgVal ? parseInt(epsgVal, 10) : null;
 
     const featureCBs = document.querySelectorAll('input[name="feature-vars"]:checked');
     const features = Array.from(featureCBs).map(cb => cb.value);
@@ -302,7 +369,6 @@ async function handleConfigure() {
         return;
     }
 
-    // Backend expects coords as [x_col, y_col] array
     const config = {
         dataset: State.datasetName,
         target,
@@ -310,6 +376,7 @@ async function handleConfigure() {
         coords: [coordX, coordY],
         coord_type: coordType,
     };
+    if (epsg) config.epsg = epsg;
 
     showStatus('configure-status', 'Configuring...', 'info');
 
@@ -322,11 +389,20 @@ async function handleConfigure() {
         State.datasetConfig = config;
 
         // Update bandwidth params based on coordinate type and data extent
+        // Use effective coord_type from server (may differ from user selection after auto-conversion)
         updateBandwidthParams(result.coord_type, result.bandwidth_suggestion);
 
-        showStatus('configure-status',
-            `Configured: ${result.n_rows} rows, ${result.n_features} features. Y mean=${result.y_stats?.mean}`,
-            'success');
+        let statusMsg = `Configured: ${result.n_rows} rows, ${result.n_features} features. Y mean=${result.y_stats?.mean}`;
+        if (result.auto_converted) {
+            statusMsg += ' (Coords auto-converted to lon/lat)';
+            // Update the UI to reflect the effective coord type
+            const geoRadio = document.querySelector('input[name="coord-type"][value="geodetic"]');
+            if (geoRadio) {
+                geoRadio.checked = true;
+                document.getElementById('epsg-group').classList.add('hidden');
+            }
+        }
+        showStatus('configure-status', statusMsg, 'success');
         document.getElementById('btn-train').disabled = false;
         updateButtonStates();
         openPanel('model');
@@ -376,7 +452,6 @@ async function handleTrain() {
     const trainRatio = parseFloat(document.getElementById('train-ratio').value);
     const seed = parseInt(document.getElementById('random-seed').value, 10);
 
-    // Backend expects model-specific params under 'model_params'
     const modelParams = {};
     if (modelType === 'random_forest') {
         modelParams.n_estimators = parseInt(document.getElementById('rf-n-estimators').value, 10);
@@ -446,11 +521,8 @@ function displayMetrics(metrics, trainResult) {
 async function loadMethods() {
     try {
         const data = await API.getMethods();
-        // API returns {methods: {key: {label, group, bayesian, params: [strings], ...}}, defaults: {...}}
         methodRegistry = data.methods || {};
         const defaults = data.defaults || {};
-        // Merge defaults into PARAM_DEFS (only for non-bandwidth params,
-        // bandwidth is managed dynamically by updateBandwidthParams)
         Object.entries(defaults).forEach(([k, v]) => {
             if (PARAM_DEFS[k] && k !== 'bandwidth' && k !== 'base_bandwidth') {
                 PARAM_DEFS[k].default = v;
@@ -466,7 +538,6 @@ function renderMethodGroups(methods) {
     const container = document.getElementById('method-groups');
     container.innerHTML = '';
 
-    // Group methods by their 'group' field
     const groups = {};
     Object.entries(methods).forEach(([key, info]) => {
         const groupName = info.group || 'Other';
@@ -497,7 +568,6 @@ function renderMethodGroups(methods) {
             lbl.appendChild(radio);
             lbl.appendChild(document.createTextNode(' ' + method.label));
 
-            // Show badges
             const badges = [];
             if (method.bayesian) badges.push('Bayesian');
             if (method.is_async) badges.push('Async');
@@ -524,7 +594,6 @@ function handleMethodSelect(method) {
     const controlsContainer = document.getElementById('param-controls');
     controlsContainer.innerHTML = '';
 
-    // method.params is an array of param key strings like ["alpha", "bandwidth"]
     const paramKeys = method.params || [];
 
     if (paramKeys.length > 0) {
@@ -537,12 +606,35 @@ function handleMethodSelect(method) {
             const wrapper = document.createElement('div');
             wrapper.style.marginBottom = '10px';
 
-            // Label
+            // Label row: label text + optional unit selector
+            const labelRow = document.createElement('div');
+            labelRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;';
+
             const lbl = document.createElement('label');
             lbl.textContent = def.label;
-            lbl.style.display = 'block';
-            lbl.style.marginBottom = '2px';
-            wrapper.appendChild(lbl);
+            lbl.style.cssText = 'display:inline;margin:0;';
+            labelRow.appendChild(lbl);
+
+            // Add unit selector for bandwidth params with multiple unit options
+            let unitSelect = null;
+            const isBwParam = def.isBandwidth && currentCoordType === 'projected';
+            if (isBwParam) {
+                const units = getAvailableUnits();
+                if (units.length > 1) {
+                    unitSelect = document.createElement('select');
+                    unitSelect.className = 'bw-unit-select';
+                    units.forEach(u => {
+                        const opt = document.createElement('option');
+                        opt.value = u.value;
+                        opt.textContent = u.label;
+                        if (u.value === bwUnit) opt.selected = true;
+                        unitSelect.appendChild(opt);
+                    });
+                    labelRow.appendChild(unitSelect);
+                }
+            }
+
+            wrapper.appendChild(labelRow);
 
             // Slider + number input row
             const row = document.createElement('div');
@@ -564,31 +656,79 @@ function handleMethodSelect(method) {
             numInput.value = def.default;
             numInput.className = 'param-number-input';
 
+            // For bandwidth params: store native value (convert display → native)
+            const toNative = (displayVal) => {
+                if (isBwParam) return displayVal / bwFactor;
+                return displayVal;
+            };
+
             // Sync slider → number input
             slider.addEventListener('input', () => {
                 numInput.value = slider.value;
+                const displayVal = parseFloat(slider.value);
                 State.methodParams[paramKey] = def.type === 'float'
-                    ? parseFloat(slider.value) : parseInt(slider.value, 10);
+                    ? toNative(displayVal) : parseInt(slider.value, 10);
             });
 
-            // Sync number input → slider (allow values outside slider range for flexibility)
+            // Sync number input → slider
             numInput.addEventListener('change', () => {
                 let v = parseFloat(numInput.value);
                 if (isNaN(v)) v = def.default;
-                // Clamp to min but allow exceeding slider max for manual precision
                 v = Math.max(def.min, v);
                 numInput.value = v;
-                // Update slider (will clamp to slider range visually)
                 slider.value = Math.min(Math.max(v, def.min), def.max);
-                State.methodParams[paramKey] = def.type === 'float' ? v : Math.round(v);
+                State.methodParams[paramKey] = def.type === 'float' ? toNative(v) : Math.round(v);
             });
+
+            // Unit selector change: rescale everything
+            if (unitSelect) {
+                unitSelect.addEventListener('change', () => {
+                    const oldFactor = bwFactor;
+                    const newUnit = unitSelect.value;
+                    const units = getAvailableUnits();
+                    const unitInfo = units.find(u => u.value === newUnit);
+                    if (!unitInfo) return;
+
+                    // Get current native value
+                    const currentNative = State.methodParams[paramKey] || nativeBandwidthDef.default;
+
+                    // Update global unit
+                    bwUnit = newUnit;
+                    bwFactor = unitInfo.factor;
+
+                    // Recompute display PARAM_DEFS
+                    applyBandwidthUnit();
+                    const newDef = PARAM_DEFS[paramKey];
+
+                    // Update slider range
+                    slider.min = newDef.min;
+                    slider.max = newDef.max;
+                    slider.step = newDef.step;
+                    numInput.min = newDef.min;
+                    numInput.max = newDef.max;
+                    numInput.step = newDef.step;
+
+                    // Convert current value to new display unit
+                    const newDisplayVal = roundSmart(currentNative * bwFactor);
+                    slider.value = Math.min(Math.max(newDisplayVal, newDef.min), newDef.max);
+                    numInput.value = newDisplayVal;
+
+                    // Update label
+                    lbl.textContent = newDef.label;
+
+                    // Native value stays the same
+                    State.methodParams[paramKey] = currentNative;
+                });
+            }
 
             row.appendChild(slider);
             row.appendChild(numInput);
             wrapper.appendChild(row);
 
+            // Initialize state with native value
+            const displayDefault = parseFloat(def.default);
             State.methodParams[paramKey] = def.type === 'float'
-                ? parseFloat(def.default) : parseInt(def.default, 10);
+                ? toNative(displayDefault) : parseInt(def.default, 10);
 
             controlsContainer.appendChild(wrapper);
         });
@@ -625,7 +765,6 @@ async function handleRun() {
     statusText.textContent = 'Submitting analysis...';
 
     try {
-        // Run endpoint always returns {job_id}
         const response = await API.runAnalysis(State.selectedMethod, State.methodParams);
         if (response.error) {
             statusText.textContent = response.error;
@@ -655,7 +794,6 @@ async function pollJob(jobId, progressFill, statusText) {
                 progressFill.style.width = Math.round(statusResp.progress) + '%';
             }
 
-            // Backend returns status: "done" | "running" | "error"
             if (statusResp.status === 'done') {
                 progressFill.style.width = '100%';
                 statusText.textContent = 'Complete! Loading results...';
@@ -664,7 +802,6 @@ async function pollJob(jobId, progressFill, statusText) {
                     statusText.textContent = 'Error: ' + resultResp.error;
                     return;
                 }
-                // Results endpoint returns {status: "done", result: {...}}
                 if (!resultResp.result) {
                     console.error('No result in response:', resultResp);
                     statusText.textContent = 'Error: empty result from server';
@@ -695,7 +832,6 @@ async function pollJob(jobId, progressFill, statusText) {
 }
 
 function handleResults(result) {
-    // result = {method, method_label, is_bayesian, summary: {...}, per_point: {...}}
     State.setResults(result);
 
     const summaryCard = document.getElementById('result-summary');

@@ -13,7 +13,7 @@ def create_app():
         static_folder=os.path.join(BASE_DIR, "static"),
         template_folder=os.path.join(BASE_DIR, "templates"),
     )
-    app.secret_key = secrets.token_hex(16)
+    app.secret_key = os.environ.get("FLASK_SECRET_KEY", "wbcp-dev-key-do-not-use-in-prod")
     app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50MB
     CORS(app)
 
@@ -38,5 +38,5 @@ def create_app():
 if __name__ == "__main__":
     app = create_app()
     port = int(os.environ.get("PORT", 5000))
-    # app.run(debug=False, port=port)
-    app.run(host="0.0.0.0", port=port)
+    app.run(debug=True, port=port)
+    # app.run(host="0.0.0.0", port=port)

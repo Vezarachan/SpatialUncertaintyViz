@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WBCP: Interactive Uncertainty Visualization</title>
+    <title>Revealing the Dark Side of GeoAI</title>
     <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <header class="header">
-        <h1>WBCP: Interactive Uncertainty Visualization</h1>
-        <span class="header-subtitle">Weighted Bayesian Conformal Prediction</span>
+        <h1>Revealing the Dark Side of GeoAI</h1>
+        <span class="header-subtitle">Uncertainty Quantification via Conformal Prediction</span>
     </header>
 
     <div class="app-container">
@@ -53,6 +53,11 @@
                         <div class="radio-group">
                             <label><input type="radio" name="coord-type" value="geodetic" checked> Geodetic (Lon/Lat)</label>
                             <label><input type="radio" name="coord-type" value="projected"> Projected (UTM, State Plane, etc.)</label>
+                        </div>
+
+                        <div id="epsg-group" class="hidden">
+                            <label>EPSG Code <small style="font-weight:400;text-transform:none">(optional, for map display)</small></label>
+                            <input type="number" id="epsg-code" placeholder="e.g. 5070, 32610" class="input-num" style="width:140px">
                         </div>
 
                         <button id="btn-configure" class="btn btn-primary">Configure Dataset</button>
@@ -146,6 +151,10 @@
             <div class="map-container" id="map-container">
                 <div id="map" class="map"></div>
                 <div class="map-controls">
+                    <select id="map-mode" class="map-control-select">
+                        <option value="scatter">Scatter Plot</option>
+                        <option value="halo">Halo Glyphs</option>
+                    </select>
                     <select id="color-metric" class="map-control-select">
                         <option value="uncertainty">Uncertainty</option>
                         <option value="residual">Prediction Error</option>
@@ -176,11 +185,11 @@
     <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/deck.gl@9.0.16/dist.min.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script type="module" src="/static/js/api.js?v=2"></script>
-    <script type="module" src="/static/js/state.js?v=2"></script>
-    <script type="module" src="/static/js/sidebar.js?v=2"></script>
-    <script type="module" src="/static/js/mapView.js?v=2"></script>
-    <script type="module" src="/static/js/charts.js?v=2"></script>
-    <script type="module" src="/static/js/app.js?v=2"></script>
+    <script type="module" src="/static/js/api.js?v=7"></script>
+    <script type="module" src="/static/js/state.js?v=7"></script>
+    <script type="module" src="/static/js/sidebar.js?v=7"></script>
+    <script type="module" src="/static/js/mapView.js?v=7"></script>
+    <script type="module" src="/static/js/charts.js?v=7"></script>
+    <script type="module" src="/static/js/app.js?v=7"></script>
 </body>
 </html>

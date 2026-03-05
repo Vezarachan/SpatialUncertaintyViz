@@ -61,7 +61,8 @@ def configure_dataset():
     target_col = data.get("target")
     feature_cols = data.get("features")
     coord_cols = data.get("coords")  # [x_col, y_col]
-    coord_type = data.get("coord_type", "lonlat")
+    coord_type = data.get("coord_type", "geodetic")
+    epsg_code = data.get("epsg")  # optional EPSG code for projected CRS
     region_col = data.get("region")
 
     if not all([dataset_name, target_col, feature_cols, coord_cols]):
@@ -72,17 +73,62 @@ def configure_dataset():
 
         y = df[target_col].values.astype(float)
         X = df[feature_cols].values.astype(float)
-        coords = df[coord_cols].values.astype(float)
+        raw_coords = df[coord_cols].values.astype(float)
 
-        # Convert coordinates to lon/lat for Deck.gl
-        lon, lat = coordinate_service.convert_to_lonlat(
-            coords[:, 0], coords[:, 1], coord_type
-        )
-        coords_lonlat = np.column_stack([lon, lat])
+        auto_converted = False
+        effective_coord_type = coord_type
+
+        # Auto-detect: if user says "geodetic" but coords look projected, auto-convert
+        if coord_type == "geodetic" and coordinate_service.is_likely_projected(
+                raw_coords[:, 0], raw_coords[:, 1]):
+            # Coordinates are clearly not lon/lat — try to convert
+            if epsg_code:
+                lon, lat = coordinate_service.convert_to_lonlat(
+                    raw_coords[:, 0], raw_coords[:, 1], "projected", epsg_code=epsg_code
+                )
+                # Use converted lon/lat as the working coordinates
+                coords = np.column_stack([lon, lat])
+                coords_lonlat = coords.copy()
+                effective_coord_type = "geodetic"  # now we're in lon/lat space
+                auto_converted = True
+            else:
+                # Try auto-detection (UTM zone estimation)
+                try:
+                    lon, lat = coordinate_service.convert_to_lonlat(
+                        raw_coords[:, 0], raw_coords[:, 1], "projected", epsg_code=None
+                    )
+                    if -180 <= np.mean(lon) <= 180 and -90 <= np.mean(lat) <= 90:
+                        coords = np.column_stack([lon, lat])
+                        coords_lonlat = coords.copy()
+                        effective_coord_type = "geodetic"
+                        auto_converted = True
+                    else:
+                        # Conversion failed, fall back to treating as projected
+                        coords = raw_coords
+                        effective_coord_type = "projected"
+                        coords_lonlat = np.column_stack([lon, lat])
+                except Exception:
+                    # Can't convert — treat as projected
+                    coords = raw_coords
+                    effective_coord_type = "projected"
+                    lon = raw_coords[:, 0]
+                    lat = raw_coords[:, 1]
+                    coords_lonlat = raw_coords.copy()
+        elif coord_type == "projected":
+            # Standard projected: keep native coords for spatial analysis
+            coords = raw_coords
+            lon, lat = coordinate_service.convert_to_lonlat(
+                raw_coords[:, 0], raw_coords[:, 1], coord_type, epsg_code=epsg_code
+            )
+            coords_lonlat = np.column_stack([lon, lat])
+        else:
+            # Standard geodetic: coords are already lon/lat
+            coords = raw_coords
+            coords_lonlat = raw_coords.copy()
 
         # Compute coordinate extent statistics for bandwidth scaling
         coord_stats = coordinate_service.compute_coord_stats(coords)
-        bandwidth_suggestion = coordinate_service.suggest_bandwidth(coord_type, coord_stats)
+        bandwidth_suggestion = coordinate_service.suggest_bandwidth(effective_coord_type, coord_stats)
 
         # Store in session-like global store (simple dict for single-user)
         from backend.services.session_store import store
@@ -102,15 +148,15 @@ def configure_dataset():
             "target_col": target_col,
             "feature_cols": feature_cols,
             "coord_cols": coord_cols,
-            "coord_type": coord_type,
+            "coord_type": effective_coord_type,
             "region_col": region_col,
         }
 
-        return jsonify({
+        response = {
             "status": "ok",
             "n_rows": len(y),
             "n_features": X.shape[1],
-            "coord_type": coord_type,
+            "coord_type": effective_coord_type,
             "coord_stats": coord_stats,
             "bandwidth_suggestion": bandwidth_suggestion,
             "y_stats": {
@@ -119,7 +165,16 @@ def configure_dataset():
                 "min": round(float(np.min(y)), 4),
                 "max": round(float(np.max(y)), 4),
             },
-        })
+        }
+
+        if auto_converted:
+            response["auto_converted"] = True
+            response["message"] = (
+                "Coordinates were auto-converted from projected to lon/lat. "
+                "Bandwidth is now in degrees."
+            )
+
+        return jsonify(response)
     except Exception as e:
         import traceback
         return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 400

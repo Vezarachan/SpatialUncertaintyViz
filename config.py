@@ -95,6 +95,7 @@ BUILTIN_DATASETS = {
         "features": ["X1", "X2", "X3", "X4", "X5", "X6", "X7", "X8", "X9", "X10", "X11", "X12", "X13", "X14"],
         "coords": ["proj_x", "proj_y"],
         "coord_type": "projected",
+        "epsg": 5070,  # NAD83 / Conus Albers Equal Area
         "region": "region",
         "metadata_sheet": "US_Politics_Voting",
         "description": "US Politics - Democratic voting percentage",
@@ -105,6 +106,7 @@ BUILTIN_DATASETS = {
         "features": ["bathrooms", "sqft_living", "sqft_lot", "grade", "condition", "waterfront", "view", "age"],
         "coords": ["UTM_X", "UTM_Y"],
         "coord_type": "projected",
+        "epsg": 32610,  # UTM Zone 10N
         "region": None,
         "metadata_sheet": None,
         "description": "Seattle Housing - Log price prediction (3k samples)",

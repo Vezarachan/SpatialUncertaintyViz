@@ -1,4 +1,4 @@
-// Map visualization with Deck.gl
+// Map visualization with Deck.gl — 2 modes: Scatter, Halo Glyphs
 import State from './state.js';
 
 let map = null;
@@ -6,7 +6,8 @@ let deckOverlay = null;
 let currentData = null;
 let currentDataExtent = 100; // diagonal degrees of data extent
 let mapLoaded = false;
-let pendingResults = null; // queue results if map not ready
+let pendingResults = null;
+let currentMapMode = 'scatter'; // 'scatter' | 'halo'
 
 function initMap() {
     map = new maplibregl.Map({
@@ -45,6 +46,19 @@ function initMap() {
         }
     });
 
+    // Map mode change
+    document.getElementById('map-mode').addEventListener('change', (e) => {
+        currentMapMode = e.target.value;
+        if (currentData) {
+            try {
+                const metric = document.getElementById('color-metric').value;
+                updateLayers(currentData, metric);
+            } catch (err) {
+                console.error('[MapView] Mode switch error:', err);
+            }
+        }
+    });
+
     // Color metric change
     document.getElementById('color-metric').addEventListener('change', (e) => {
         if (currentData) {
@@ -66,8 +80,10 @@ function safeUpdateMap(results) {
     }
 }
 
+// ============================================================
 // Safe min/max for large arrays (avoids spread operator stack overflow)
 // Also skips NaN / Infinity
+// ============================================================
 function arrayMin(arr) {
     let min = Infinity;
     for (let i = 0; i < arr.length; i++) {
@@ -83,6 +99,16 @@ function arrayMax(arr) {
     return max;
 }
 
+// ============================================================
+// Resolve metric values from per-point data
+// ============================================================
+function getMetricValues(pp, metric) {
+    return pp[metric] || pp.uncertainty;
+}
+
+// ============================================================
+// Update map: fit bounds + render layers
+// ============================================================
 function updateMap(results) {
     currentData = results;
     const coords = results.per_point?.coords_lonlat;
@@ -130,11 +156,27 @@ function updateMap(results) {
     updateLayers(results, metric);
 }
 
+// ============================================================
+// Dispatch to the correct layer renderer
+// ============================================================
 function updateLayers(results, metric) {
+    switch (currentMapMode) {
+        case 'halo':
+            updateHaloLayers(results);
+            break;
+        default:
+            updateScatterLayers(results, metric);
+    }
+}
+
+// ============================================================
+// Mode 1: Scatter Plot (original)
+// ============================================================
+function updateScatterLayers(results, metric) {
     const pp = results.per_point;
     if (!pp) return;
 
-    const values = pp[metric] || pp.uncertainty;
+    const values = getMetricValues(pp, metric);
     if (!values || values.length === 0) return;
 
     // Filter out NaN / Infinity for statistics
@@ -184,31 +226,132 @@ function updateLayers(results, metric) {
                 State.setSelectedPoint(info.object.index);
             }
         },
-        onHover: (info) => {
-            const tooltip = document.getElementById('tooltip');
-            if (info.object) {
-                const d = info.object;
-                tooltip.innerHTML = `
-                    <strong>Point #${d.index}</strong><br>
-                    True: ${d.trueValue.toFixed(3)}<br>
-                    Predicted: ${d.predValue.toFixed(3)}<br>
-                    Uncertainty: ${d.uncertainty.toFixed(3)}<br>
-                    Covered: ${d.covered ? 'Yes' : 'No'}<br>
-                    Residual: ${d.residual.toFixed(3)}
-                `;
-                tooltip.style.left = info.x + 10 + 'px';
-                tooltip.style.top = info.y + 10 + 'px';
-                tooltip.classList.remove('hidden');
-            } else {
-                tooltip.classList.add('hidden');
-            }
-        },
+        onHover: handlePointHover,
     });
 
     deckOverlay.setProps({ layers: [scatterLayer] });
     updateLegend(vMin, vMax, metric);
 }
 
+// ============================================================
+// Mode 2: Adaptive Halo Glyphs
+//   - Color = predicted value
+//   - Halo radius = prediction interval width
+// ============================================================
+function updateHaloLayers(results) {
+    const pp = results.per_point;
+    if (!pp) return;
+
+    const coords = pp.coords_lonlat;
+    const predValues = pp.pred_value || [];
+    const uncValues = pp.uncertainty || [];
+
+    const finPred = predValues.filter(v => Number.isFinite(v));
+    const finUnc = uncValues.filter(v => Number.isFinite(v));
+    if (finPred.length === 0 || finUnc.length === 0) return;
+
+    const predMin = arrayMin(finPred), predMax = arrayMax(finPred);
+    const predRange = predMax - predMin || 1;
+    const uncMin = arrayMin(finUnc), uncMax = arrayMax(finUnc);
+    const uncRange = uncMax - uncMin || 1;
+
+    const data = coords.map((coord, i) => ({
+        position: coord,
+        index: i,
+        predValue: predValues[i] || 0,
+        normalizedPred: (((predValues[i] || 0) - predMin) / predRange),
+        uncertainty: uncValues[i] || 0,
+        normalizedUnc: (((uncValues[i] || 0) - uncMin) / uncRange),
+        trueValue: pp.true_value?.[i] ?? 0,
+        covered: pp.covered?.[i] ?? false,
+        residual: pp.residual?.[i] ?? 0,
+    }));
+
+    // Adaptive radii based on data extent
+    const maxHaloRadius = Math.max(2000, currentDataExtent * 111000 / 22);
+    const minHaloRadius = maxHaloRadius * 0.12;
+
+    // Layer 1: Outer glow — semi-transparent, proportional to uncertainty
+    const outerGlow = new deck.ScatterplotLayer({
+        id: 'halo-outer',
+        data,
+        getPosition: d => d.position,
+        getFillColor: d => {
+            const c = valueToColor(d.normalizedPred, 'sequential');
+            return [c[0], c[1], c[2], 70];
+        },
+        getRadius: d => minHaloRadius + d.normalizedUnc * (maxHaloRadius - minHaloRadius),
+        radiusMinPixels: 12,
+        radiusMaxPixels: 60,
+        pickable: false,
+    });
+
+    // Layer 2: Inner glow — more opaque, 55% of outer radius
+    const innerGlow = new deck.ScatterplotLayer({
+        id: 'halo-inner',
+        data,
+        getPosition: d => d.position,
+        getFillColor: d => {
+            const c = valueToColor(d.normalizedPred, 'sequential');
+            return [c[0], c[1], c[2], 130];
+        },
+        getRadius: d => (minHaloRadius + d.normalizedUnc * (maxHaloRadius - minHaloRadius)) * 0.55,
+        radiusMinPixels: 7,
+        radiusMaxPixels: 35,
+        pickable: false,
+    });
+
+    // Layer 3: Center dot — opaque, colored by predicted value
+    const centerRadius = Math.max(400, currentDataExtent * 111000 / 80);
+    const centerDot = new deck.ScatterplotLayer({
+        id: 'halo-center',
+        data,
+        getPosition: d => d.position,
+        getFillColor: d => valueToColor(d.normalizedPred, 'sequential'),
+        getLineColor: [40, 40, 70, 200],
+        stroked: true,
+        lineWidthMinPixels: 1,
+        getRadius: centerRadius,
+        radiusMinPixels: 4,
+        radiusMaxPixels: 14,
+        pickable: true,
+        autoHighlight: true,
+        highlightColor: [255, 255, 0, 180],
+        onClick: (info) => {
+            if (info.object) State.setSelectedPoint(info.object.index);
+        },
+        onHover: handlePointHover,
+    });
+
+    deckOverlay.setProps({ layers: [outerGlow, innerGlow, centerDot] });
+    updateHaloLegend(predMin, predMax, uncMin, uncMax);
+}
+
+// ============================================================
+// Shared hover handler for data points
+// ============================================================
+function handlePointHover(info) {
+    const tooltip = document.getElementById('tooltip');
+    if (info.object) {
+        const d = info.object;
+        let html = `<strong>Point #${d.index}</strong><br>`;
+        html += `True: ${d.trueValue.toFixed(3)}<br>`;
+        html += `Predicted: ${d.predValue.toFixed(3)}<br>`;
+        html += `Uncertainty: ${d.uncertainty.toFixed(3)}<br>`;
+        html += `Covered: ${d.covered ? 'Yes' : 'No'}<br>`;
+        html += `Residual: ${d.residual.toFixed(3)}`;
+        tooltip.innerHTML = html;
+        tooltip.style.left = info.x + 10 + 'px';
+        tooltip.style.top = info.y + 10 + 'px';
+        tooltip.classList.remove('hidden');
+    } else {
+        tooltip.classList.add('hidden');
+    }
+}
+
+// ============================================================
+// Color Mapping
+// ============================================================
 function valueToColor(t, metric) {
     // t is 0-1 normalized; clamp to [0,1]
     t = Math.max(0, Math.min(1, t));
@@ -241,20 +384,58 @@ function valueToColor(t, metric) {
     }
 }
 
-function updateLegend(vMin, vMax, metric) {
-    const legend = document.getElementById('map-legend');
+// ============================================================
+// Metric label helper
+// ============================================================
+function getMetricLabel(metric) {
     const labels = {
         uncertainty: 'Uncertainty',
         residual: 'Prediction Error',
         posterior_std: 'Posterior Std',
         n_eff: 'Effective Sample Size',
     };
+    return labels[metric] || metric;
+}
+
+// ============================================================
+// Legends
+// ============================================================
+function updateLegend(vMin, vMax, metric) {
+    const legend = document.getElementById('map-legend');
     legend.innerHTML = `
-        <div class="legend-title">${labels[metric] || metric}</div>
+        <div class="legend-title">${getMetricLabel(metric)}</div>
         <div class="legend-bar"></div>
         <div class="legend-labels">
             <span>${vMin.toFixed(2)}</span>
             <span>${vMax.toFixed(2)}</span>
+        </div>
+    `;
+}
+
+function updateHaloLegend(predMin, predMax, uncMin, uncMax) {
+    const legend = document.getElementById('map-legend');
+    legend.innerHTML = `
+        <div class="legend-title">Predicted Value (color)</div>
+        <div class="legend-bar"></div>
+        <div class="legend-labels">
+            <span>${predMin.toFixed(2)}</span>
+            <span>${predMax.toFixed(2)}</span>
+        </div>
+        <div class="legend-separator"></div>
+        <div class="legend-title">Uncertainty (halo size)</div>
+        <div class="legend-halo-sizes">
+            <div class="halo-size-item">
+                <div class="halo-circle halo-small"></div>
+                <span>${uncMin.toFixed(3)}</span>
+            </div>
+            <div class="halo-size-item">
+                <div class="halo-circle halo-medium"></div>
+                <span>${((uncMin + uncMax) / 2).toFixed(3)}</span>
+            </div>
+            <div class="halo-size-item">
+                <div class="halo-circle halo-large"></div>
+                <span>${uncMax.toFixed(3)}</span>
+            </div>
         </div>
     `;
 }
