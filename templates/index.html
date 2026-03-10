@@ -6,12 +6,25 @@
     <title>Revealing the Dark Side of GeoAI</title>
     <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css">
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 </head>
 <body>
     <header class="header">
         <h1>Revealing the Dark Side of GeoAI</h1>
         <span class="header-subtitle">Uncertainty Quantification via Conformal Prediction</span>
     </header>
+
+    <div class="info-banner" id="info-banner">
+        <div class="info-banner-teaser" id="info-banner-toggle">
+            <span class="info-banner-icon">&#9432;</span>
+            <span>What is Spatial Uncertainty?</span>
+            <span class="info-banner-arrow">&#9660;</span>
+        </div>
+        <div class="info-banner-content" id="info-banner-content">
+            <p><strong>Spatial uncertainty</strong> refers to the inherent unpredictability in geospatial predictions &mdash; the gap between what a model predicts and the true values at unobserved locations. Unlike traditional ML settings, spatial data exhibits <em>spatial autocorrelation</em>: nearby locations tend to have similar values, so prediction quality varies across geographic space.</p>
+            <p><strong>Conformal prediction (CP)</strong> provides a distribution-free framework for quantifying this uncertainty. It wraps any prediction model to produce <em>prediction intervals with guaranteed coverage probability</em>, without assuming a specific data distribution. The spatial CP variants in this tool extend CP to account for geographic proximity, ensuring locally-calibrated prediction intervals.</p>
+        </div>
+    </div>
 
     <div class="app-container">
         <!-- Sidebar -->
@@ -24,6 +37,7 @@
                     <span class="panel-toggle">&#9660;</span>
                 </div>
                 <div class="panel-body open" id="panel-body-dataset">
+                    <p class="panel-hint">Choose a built-in spatial dataset or upload your own CSV with geographic coordinates and a target variable.</p>
                     <label>Select Dataset</label>
                     <select id="dataset-select">
                         <option value="">-- Choose a dataset --</option>
@@ -74,6 +88,7 @@
                     <span class="panel-toggle">&#9654;</span>
                 </div>
                 <div class="panel-body" id="panel-body-model">
+                    <p class="panel-hint">Select a base prediction model. Its residuals on a held-out calibration set are used to construct prediction intervals.</p>
                     <label>Base Prediction Model</label>
                     <div class="radio-group">
                         <label><input type="radio" name="model-type" value="ols" checked> OLS (Linear)</label>
@@ -119,6 +134,8 @@
                     <span class="panel-toggle">&#9654;</span>
                 </div>
                 <div class="panel-body" id="panel-body-method">
+                    <p class="panel-hint">Choose a conformal prediction method. Methods differ in how they weight calibration points to produce spatially-adaptive prediction intervals.</p>
+                    <button class="btn-learn-more" id="btn-about-methods">&#9432; About CP Methods</button>
                     <div id="method-groups"></div>
                     <div id="method-params" class="hidden">
                         <hr>
@@ -136,6 +153,7 @@
                     <span class="panel-toggle">&#9654;</span>
                 </div>
                 <div class="panel-body" id="panel-body-run">
+                    <p class="panel-hint">Execute the analysis to produce prediction intervals for all test points. Results appear on the map and charts.</p>
                     <button id="btn-run" class="btn btn-run" disabled>Run Analysis</button>
                     <div id="run-progress" class="hidden">
                         <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
@@ -159,7 +177,7 @@
                         <option value="uncertainty">Uncertainty</option>
                         <option value="residual">Prediction Error</option>
                         <option value="posterior_std">Posterior Std</option>
-                        <option value="n_eff">N_eff</option>
+                        <option value="n_eff">Neff</option>
                     </select>
                     <div id="map-legend" class="map-legend"></div>
                 </div>
@@ -172,12 +190,20 @@
                     <button class="chart-tab" data-tab="uncertainty">Uncertainty</button>
                     <button class="chart-tab" data-tab="intervals">Intervals</button>
                     <button class="chart-tab" data-tab="posterior">Posterior</button>
-                    <button class="chart-tab" data-tab="neff">N_eff</button>
+                    <button class="chart-tab" data-tab="neff">N<sub>eff</sub></button>
                     <button class="chart-tab" data-tab="residuals">Residuals</button>
                 </div>
                 <div class="chart-area" id="chart-area">
                     <div class="chart-placeholder">Select a dataset, train a model, and run an analysis to see results.</div>
                 </div>
+            </div>
+            <!-- Method Drawer Overlay -->
+            <div class="method-drawer hidden" id="method-drawer">
+                <div class="drawer-header">
+                    <h2>Understanding Conformal Prediction</h2>
+                    <button class="drawer-close" id="drawer-close">&times;</button>
+                </div>
+                <div class="drawer-body" id="drawer-body"></div>
             </div>
         </main>
     </div>
@@ -185,11 +211,14 @@
     <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/deck.gl@9.0.16/dist.min.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script type="module" src="/static/js/api.js?v=9"></script>
-    <script type="module" src="/static/js/state.js?v=9"></script>
-    <script type="module" src="/static/js/sidebar.js?v=9"></script>
-    <script type="module" src="/static/js/mapView.js?v=9"></script>
-    <script type="module" src="/static/js/charts.js?v=9"></script>
-    <script type="module" src="/static/js/app.js?v=9"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script type="module" src="/static/js/api.js?v=10"></script>
+    <script type="module" src="/static/js/state.js?v=10"></script>
+    <script type="module" src="/static/js/sidebar.js?v=10"></script>
+    <script type="module" src="/static/js/mapView.js?v=10"></script>
+    <script type="module" src="/static/js/charts.js?v=10"></script>
+    <script type="module" src="/static/js/methodContent.js?v=10"></script>
+    <script type="module" src="/static/js/methodDrawer.js?v=10"></script>
+    <script type="module" src="/static/js/app.js?v=10"></script>
 </body>
 </html>

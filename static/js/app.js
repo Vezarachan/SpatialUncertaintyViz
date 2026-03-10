@@ -4,6 +4,7 @@ import State from './state.js';
 import { initSidebar } from './sidebar.js';
 import { initMap } from './mapView.js';
 import { initCharts } from './charts.js';
+import { initDrawer } from './methodDrawer.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Init panel accordion
@@ -21,4 +22,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initSidebar();
     initMap();
     initCharts();
+    initDrawer();
 });

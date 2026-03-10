@@ -4,6 +4,16 @@ import State from './state.js';
 let activeTab = 'coverage';
 let currentResults = null;
 
+// Chart tab descriptions shown as subtitles
+const CHART_DESCRIPTIONS = {
+    coverage: 'Proportion of test points whose true values fall within their prediction intervals. The dashed line marks the target (1\u2212\u03b1).',
+    uncertainty: 'Distribution of prediction interval widths across all test points. Wider intervals indicate higher local uncertainty.',
+    intervals: 'Each vertical bar shows the prediction interval for a test point, sorted by predicted value. Green = covered; Red = not covered.',
+    posterior: 'Posterior distribution of the quantile threshold for a selected point (Bayesian methods only). Spread indicates quantile uncertainty.',
+    neff: 'Distribution of effective sample sizes (N_eff) across test points. N_eff indicates how many calibration points effectively contribute to each interval.',
+    residuals: 'Predicted vs true values for all test points. Points near the 1:1 line indicate accurate predictions; color shows coverage status.',
+};
+
 function initCharts() {
     // Tab click handlers
     document.querySelectorAll('.chart-tab').forEach(tab => {
@@ -11,7 +21,14 @@ function initCharts() {
             document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
             activeTab = tab.dataset.tab;
-            renderActiveChart();
+            if (currentResults) {
+                renderActiveChart();
+            } else {
+                // Show description even without results
+                const area = document.getElementById('chart-area');
+                area.innerHTML = '<div class="chart-placeholder">Select a dataset, train a model, and run an analysis to see results.</div>';
+                renderChartDescription();
+            }
         });
     });
 
@@ -34,10 +51,22 @@ function initCharts() {
     }, 250));
 }
 
+function renderChartDescription() {
+    const area = document.getElementById('chart-area');
+    const desc = CHART_DESCRIPTIONS[activeTab];
+    if (desc) {
+        const descEl = document.createElement('div');
+        descEl.className = 'chart-description';
+        descEl.textContent = desc;
+        area.appendChild(descEl);
+    }
+}
+
 function renderActiveChart() {
     if (!currentResults) return;
     const area = document.getElementById('chart-area');
     area.innerHTML = '';
+    renderChartDescription();
 
     const rect = area.getBoundingClientRect();
     const width = rect.width || 600;

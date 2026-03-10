@@ -541,6 +541,7 @@ input[type="range"]::-moz-range-thumb {
     flex-direction: column;
     overflow: hidden;
     min-width: 0;
+    position: relative;
 }
 
 /* --- Map --- */
@@ -788,6 +789,479 @@ input[type="range"]::-moz-range-thumb {
 .gauge-sublabel {
     fill: var(--text-muted);
     font-size: 11px;
+}
+
+/* --- Info Banner --- */
+.info-banner {
+    background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary));
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.info-banner-teaser {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 24px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    transition: color var(--transition);
+}
+
+.info-banner-teaser:hover {
+    color: var(--text-primary);
+}
+
+.info-banner-icon {
+    font-size: 16px;
+    color: var(--accent);
+}
+
+.info-banner-arrow {
+    margin-left: auto;
+    font-size: 9px;
+    color: var(--text-muted);
+    transition: transform var(--transition);
+}
+
+.info-banner.open .info-banner-arrow {
+    transform: rotate(180deg);
+}
+
+.info-banner-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease, padding 0.35s ease;
+    padding: 0 24px;
+}
+
+.info-banner.open .info-banner-content {
+    max-height: 400px;
+    padding: 0 24px 12px;
+}
+
+.info-banner-content p {
+    font-size: 12px;
+    line-height: 1.65;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.info-banner-content p:last-child {
+    margin-bottom: 0;
+}
+
+.info-banner-content strong {
+    color: var(--text-primary);
+}
+
+.info-banner-content em {
+    color: var(--accent);
+    font-style: italic;
+}
+
+/* --- Panel Hints --- */
+.panel-hint {
+    font-size: 11px;
+    font-style: italic;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin: 0 0 8px 0;
+    padding: 0;
+}
+
+/* --- Learn More Button --- */
+.btn-learn-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(233, 69, 96, 0.1);
+    color: var(--accent);
+    border: 1px solid rgba(233, 69, 96, 0.25);
+    border-radius: var(--radius);
+    padding: 5px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--font-family);
+    cursor: pointer;
+    margin-bottom: 10px;
+    transition: all var(--transition);
+}
+
+.btn-learn-more:hover {
+    background: rgba(233, 69, 96, 0.2);
+    border-color: var(--accent);
+}
+
+/* --- Method Info Icon --- */
+.method-info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(233, 69, 96, 0.15);
+    color: var(--accent);
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-left: 4px;
+    border: none;
+    padding: 0;
+    font-family: var(--font-family);
+    transition: all var(--transition);
+    flex-shrink: 0;
+}
+
+.method-info-icon:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+/* --- Method Drawer Overlay --- */
+.method-drawer {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    background: var(--bg-primary);
+    display: flex;
+    flex-direction: column;
+    animation: drawerSlideIn 0.3s ease;
+}
+
+.method-drawer.hidden {
+    display: none !important;
+}
+
+@keyframes drawerSlideIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.drawer-header h2 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.drawer-close {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 1px solid var(--border-light);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition);
+}
+
+.drawer-close:hover {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+.drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+/* --- Drawer Intro --- */
+.drawer-intro {
+    font-size: 12px;
+    line-height: 1.65;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.drawer-intro strong {
+    color: var(--text-primary);
+}
+
+/* --- Method Group in Drawer --- */
+.drawer-group {
+    margin-bottom: 24px;
+}
+
+.drawer-group-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.drawer-group-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    font-style: italic;
+}
+
+/* --- Method Card --- */
+.method-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    margin-bottom: 12px;
+    transition: border-color var(--transition);
+}
+
+.method-card:hover {
+    border-color: var(--border-light);
+}
+
+.method-card-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.method-card-title .method-badge {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--accent);
+    background: rgba(233, 69, 96, 0.12);
+    padding: 1px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+}
+
+.method-card-desc {
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+}
+
+/* --- Formula Block --- */
+.method-formula {
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    margin: 10px 0;
+    overflow-x: auto;
+    text-align: center;
+}
+
+.method-formula .katex {
+    font-size: 14px;
+}
+
+.method-formula-explain {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-top: 6px;
+}
+
+/* --- Key Idea --- */
+.method-key-idea {
+    background: rgba(233, 69, 96, 0.06);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 8px 12px;
+    margin-top: 10px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+.method-key-idea strong {
+    color: var(--accent);
+}
+
+/* --- Demo Container --- */
+.demo-container {
+    margin-top: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.demo-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.demo-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.demo-controls label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0;
+    text-transform: none;
+    letter-spacing: 0;
+    white-space: nowrap;
+}
+
+.demo-controls input[type="range"] {
+    width: 120px;
+    margin: 0;
+}
+
+.demo-controls .demo-val {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--accent);
+    min-width: 36px;
+}
+
+.demo-viz {
+    padding: 8px;
+    background: var(--bg-primary);
+    min-height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.demo-viz svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* --- Workflow Diagram --- */
+.workflow-section {
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.workflow-viz {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    margin-top: 10px;
+    max-width: 540px;
+    overflow: auto;
+}
+
+.workflow-zoom-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    user-select: none;
+}
+
+.wf-zoom-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: 1px solid var(--border-light);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition);
+    padding: 0;
+    font-family: var(--font-family);
+}
+
+.wf-zoom-btn:hover {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+.wf-zoom-reset {
+    width: auto;
+    padding: 0 8px;
+    font-size: 10px;
+    margin-left: 4px;
+}
+
+.wf-zoom-level {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    min-width: 34px;
+    text-align: center;
+}
+
+.workflow-viz-inner {
+    padding: 10px;
+    overflow: auto;
+    transition: transform 0.15s ease;
+}
+
+.workflow-viz-inner svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* --- Chart Description --- */
+.chart-description {
+    position: absolute;
+    top: 4px;
+    left: 12px;
+    right: 12px;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-style: italic;
+    line-height: 1.4;
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* --- N_eff subscript in tab --- */
+.chart-tab sub {
+    font-size: 0.8em;
+    vertical-align: baseline;
+    position: relative;
+    top: 0.2em;
 }
 
 /* --- Responsive --- */

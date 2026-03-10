@@ -1,6 +1,7 @@
 // Sidebar logic: dataset, model, method, and run panels
 import API from './api.js';
 import State from './state.js';
+import { openDrawer } from './methodDrawer.js';
 
 // Parameter definitions for CP method UI controls
 const PARAM_DEFS = {
@@ -567,6 +568,18 @@ function renderMethodGroups(methods) {
 
             lbl.appendChild(radio);
             lbl.appendChild(document.createTextNode(' ' + method.label));
+
+            // Info icon to open drawer
+            const infoBtn = document.createElement('button');
+            infoBtn.className = 'method-info-icon';
+            infoBtn.textContent = '\u24D8';
+            infoBtn.title = 'Learn about ' + method.label;
+            infoBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openDrawer(method.key);
+            });
+            lbl.appendChild(infoBtn);
 
             const badges = [];
             if (method.bayesian) badges.push('Bayesian');
